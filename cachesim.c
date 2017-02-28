@@ -5,10 +5,10 @@
 
 /*
 Usage:
-	./cachesim -I 4096:1:2:R -D 1:4096:2:4:R:B:A -D 2:16384:4:8:L:T:N trace.txt
+./cachesim -I 4096:1:2:R -D 1:4096:2:4:R:B:A -D 2:16384:4:8:L:T:N trace.txt
 
 The -I flag sets instruction cache parameters. The parameter after looks like:
-	4096:1:2:R
+4096:1:2:R
 This means the I-cache will have 4096 blocks, 1 word per block, with 2-way
 associativity.
 
@@ -16,7 +16,7 @@ The R means Random block replacement; L for that item would mean LRU. This
 replacement scheme is ignored if the associativity == 1.
 
 The -D flag sets data cache parameters. The parameter after looks like:
-	1:4096:2:4:R:B:A
+1:4096:2:4:R:B:A
 
 The first item is the level and must be 1, 2, or 3.
 
@@ -25,16 +25,16 @@ associativity like for the I-cache. The fifth item is the replacement scheme,
 just like for the I-cache.
 
 The sixth item is the write scheme and can be:
-	B for write-Back
-	T for write-Through
+B for write-Back
+T for write-Through
 
 The seventh item is the allocation scheme and can be:
-	A for write-Allocate
-	N for write-No-allocate
+A for write-Allocate
+N for write-No-allocate
 
 The last argument is the filename of the memory trace to read. This is a text
 file where every line is of the form:
-	0x00000000 R
+0x00000000 R
 A hexadecimal address, followed by a space and then R, W, or I for data read,
 data write, or instruction fetch, respectively.
 */
@@ -45,13 +45,45 @@ CacheInfo struct for docs on what's inside it. Have a look at dump_cache_info
 for an example of how to check the members. */
 static CacheInfo icache_info;
 static CacheInfo dcache_info[3];
+static Block block;
+static CacheObject cache;
+int byte_bits;
+int data_size;
+int tag_bits;
+int word_bits;
+int row_bits;
 
 void setup_caches()
 {
 	/* Set up your caches here! */
+	int num_blocks = icache_info.num_blocks;
+	int words_per_block = icache_info.words_per_block;
+	int associativity = ichache_info.associativity;
+
+	/* direct-mapped cache setup */
+	if( associativity == 1 ) {
+
+		if( num_blocks == 0 ) break;	/* cache level is disabled */
+
+		data_size = num_blocks * words_per_block * 4;
+
+		block = {
+			.byte_select = 2;
+			.row_bits = row_bits;	/* not set associative */
+			.word_bits = word_bits;
+			.tag_bits = tag_bits;
+		};
+
+	}
+
 	/* This call to dump_cache_info is just to show some debugging information
 	and you may remove it. */
 	dump_cache_info();
+}
+
+/* calculates size of the of all the bits for row, word, and tag */
+void bit_extractor() {
+
 }
 
 void handle_access(AccessType type, addr_t address)
@@ -62,15 +94,15 @@ void handle_access(AccessType type, addr_t address)
 	switch(type)
 	{
 		case Access_I_FETCH:
-			/* These prints are just for debugging and should be removed. */
-			printf("I_FETCH at %08lx\n", address);
-			break;
+		/* These prints are just for debugging and should be removed. */
+		printf("I_FETCH at %08lx\n", address);
+		break;
 		case Access_D_READ:
-			printf("D_READ at %08lx\n", address);
-			break;
+		printf("D_READ at %08lx\n", address);
+		break;
 		case Access_D_WRITE:
-			printf("D_WRITE at %08lx\n", address);
-			break;
+		printf("D_WRITE at %08lx\n", address);
+		break;
 	}
 }
 
@@ -80,7 +112,6 @@ void print_statistics()
 	results look like. Do that here.*/
 	printf("Stuff happened!!!!!\n");
 }
-
 /*******************************************************************************
 *
 *
@@ -104,10 +135,10 @@ void dump_cache_info()
 	if(icache_info.associativity > 1)
 	{
 		printf("\treplacement: %s\n\n",
-			icache_info.replacement == Replacement_LRU ? "LRU" : "Random");
+		icache_info.replacement == Replacement_LRU ? "LRU" : "Random");
 	}
 	else
-		printf("\n");
+	printf("\n");
 
 	for(i = 0; i < 3 && dcache_info[i].num_blocks != 0; i++)
 	{
@@ -121,15 +152,15 @@ void dump_cache_info()
 		if(info->associativity > 1)
 		{
 			printf("\treplacement: %s\n", info->replacement == Replacement_LRU ?
-				"LRU" : "Random");
+			"LRU" : "Random");
 		}
 
 		printf("\twrite scheme: %s\n", info->write_scheme == Write_WRITE_BACK ?
-			"write-back" : "write-through");
+		"write-back" : "write-through");
 
 		printf("\tallocation scheme: %s\n\n",
-			info->allocate_scheme == Allocate_ALLOCATE ?
-			"write-allocate" : "write-no-allocate");
+		info->allocate_scheme == Allocate_ALLOCATE ?
+		"write-allocate" : "write-no-allocate");
 	}
 }
 
@@ -152,10 +183,10 @@ void read_trace_line(FILE* trace)
 		case 'W': handle_access(Access_D_WRITE, address); break;
 		case 'I': handle_access(Access_I_FETCH, address); break;
 		default:
-			fprintf(stderr, "Malformed trace file: invalid access type '%c'.\n",
-				type);
-			exit(1);
-			break;
+		fprintf(stderr, "Malformed trace file: invalid access type '%c'.\n",
+		type);
+		exit(1);
+		break;
 	}
 }
 
@@ -188,51 +219,51 @@ FILE* parse_arguments(int argc, char** argv)
 		if(streq(argv[i], "-I"))
 		{
 			if(i == (argc - 1))
-				bad_params("Expected parameters after -I.");
+			bad_params("Expected parameters after -I.");
 
 			if(have_inst)
-				bad_params("Duplicate I-cache parameters.");
+			bad_params("Duplicate I-cache parameters.");
 			have_inst = 1;
 
 			i++;
 			converted = sscanf(argv[i], "%d:%d:%d:%c",
-				&icache_info.num_blocks,
-				&icache_info.words_per_block,
-				&icache_info.associativity,
-				&replace_scheme);
+			&icache_info.num_blocks,
+			&icache_info.words_per_block,
+			&icache_info.associativity,
+			&replace_scheme);
 
 			if(converted < 4)
-				bad_params("Invalid I-cache parameters.");
+			bad_params("Invalid I-cache parameters.");
 
 			if(icache_info.associativity > 1)
 			{
 				if(replace_scheme == 'R')
-					icache_info.replacement = Replacement_RANDOM;
+				icache_info.replacement = Replacement_RANDOM;
 				else if(replace_scheme == 'L')
-					icache_info.replacement = Replacement_LRU;
+				icache_info.replacement = Replacement_LRU;
 				else
-					bad_params("Invalid I-cache replacement scheme.");
+				bad_params("Invalid I-cache replacement scheme.");
 			}
 		}
 		else if(streq(argv[i], "-D"))
 		{
 			if(i == (argc - 1))
-				bad_params("Expected parameters after -D.");
+			bad_params("Expected parameters after -D.");
 
 			i++;
 			converted = sscanf(argv[i], "%d:%d:%d:%d:%c:%c:%c",
-				&level, &num_blocks, &words_per_block, &associativity,
-				&replace_scheme, &write_scheme, &alloc_scheme);
+			&level, &num_blocks, &words_per_block, &associativity,
+			&replace_scheme, &write_scheme, &alloc_scheme);
 
 			if(converted < 7)
-				bad_params("Invalid D-cache parameters.");
+			bad_params("Invalid D-cache parameters.");
 
 			if(level < 1 || level > 3)
-				bad_params("Inalid D-cache level.");
+			bad_params("Inalid D-cache level.");
 
 			level--;
 			if(have_data[level])
-				bad_params("Duplicate D-cache level parameters.");
+			bad_params("Duplicate D-cache level parameters.");
 
 			have_data[level] = 1;
 
@@ -243,49 +274,49 @@ FILE* parse_arguments(int argc, char** argv)
 			if(associativity > 1)
 			{
 				if(replace_scheme == 'R')
-					dcache_info[level].replacement = Replacement_RANDOM;
+				dcache_info[level].replacement = Replacement_RANDOM;
 				else if(replace_scheme == 'L')
-					dcache_info[level].replacement = Replacement_LRU;
+				dcache_info[level].replacement = Replacement_LRU;
 				else
-					bad_params("Invalid D-cache replacement scheme.");
+				bad_params("Invalid D-cache replacement scheme.");
 			}
 
 			if(write_scheme == 'B')
-				dcache_info[level].write_scheme = Write_WRITE_BACK;
+			dcache_info[level].write_scheme = Write_WRITE_BACK;
 			else if(write_scheme == 'T')
-				dcache_info[level].write_scheme = Write_WRITE_THROUGH;
+			dcache_info[level].write_scheme = Write_WRITE_THROUGH;
 			else
-				bad_params("Invalid D-cache write scheme.");
+			bad_params("Invalid D-cache write scheme.");
 
 			if(alloc_scheme == 'A')
-				dcache_info[level].allocate_scheme = Allocate_ALLOCATE;
+			dcache_info[level].allocate_scheme = Allocate_ALLOCATE;
 			else if(alloc_scheme == 'N')
-				dcache_info[level].allocate_scheme = Allocate_NO_ALLOCATE;
+			dcache_info[level].allocate_scheme = Allocate_NO_ALLOCATE;
 			else
-				bad_params("Invalid D-cache allocation scheme.");
+			bad_params("Invalid D-cache allocation scheme.");
 		}
 		else
 		{
 			if(i != (argc - 1))
-				bad_params("Trace filename should be last argument.");
+			bad_params("Trace filename should be last argument.");
 
 			break;
 		}
 	}
 
 	if(!have_inst)
-		bad_params("No I-cache parameters specified.");
+	bad_params("No I-cache parameters specified.");
 
 	if(have_data[1] && !have_data[0])
-		bad_params("L2 D-cache specified, but not L1.");
+	bad_params("L2 D-cache specified, but not L1.");
 
 	if(have_data[2] && !have_data[1])
-		bad_params("L3 D-cache specified, but not L2.");
+	bad_params("L3 D-cache specified, but not L2.");
 
 	trace = fopen(argv[argc - 1], "r");
 
 	if(trace == NULL)
-		bad_params("Could not open trace file.");
+	bad_params("Could not open trace file.");
 
 	return trace;
 }
@@ -297,7 +328,7 @@ int main(int argc, char** argv)
 	setup_caches();
 
 	while(!feof(trace))
-		read_trace_line(trace);
+	read_trace_line(trace);
 
 	fclose(trace);
 

@@ -96,5 +96,24 @@ void dump_cache_info();
 *
 *
 *******************************************************************************/
+typedef struct
+{
+	int byte_select;
+	int word_bits;
+	int row_bits;
+	int tag_bits;
+	int valid;
+	int dirty;
+} Block
+
+typedef struct
+{
+	Block cache[][];
+} CacheObject	/* cache itself will be a 2D array of block structs */
+
+typedef struct
+{
+
+} Stats
 
 #endif
