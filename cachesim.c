@@ -67,13 +67,18 @@ void setup_caches()
 
 		data_size = num_blocks * words_per_block * 4;
 
+		bit_extractor(&word_bits, &tag_bits, &row_bits);
+
 		block = {
 			.byte_select = 2;
 			.row_bits = row_bits;	/* not set associative */
 			.word_bits = word_bits;
 			.tag_bits = tag_bits;
 		};
-
+		
+		cache = {
+			.cache[num_blocks];
+		};
 	}
 
 	/* This call to dump_cache_info is just to show some debugging information
@@ -82,7 +87,7 @@ void setup_caches()
 }
 
 /* calculates size of the of all the bits for row, word, and tag */
-void bit_extractor() {
+void bit_extractor(int* word_bits, int* tag_bits, int* row_bits) {
 
 }
 

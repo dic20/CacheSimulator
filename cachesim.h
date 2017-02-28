@@ -109,6 +109,7 @@ typedef struct
 typedef struct
 {
 	Block cache[][];
+	Block cache[];
 } CacheObject	/* cache itself will be a 2D array of block structs */
 
 typedef struct
