@@ -99,17 +99,19 @@ void dump_cache_info();
 
 void bit_extractor_calculator(int*, int*, int*, int, int);
 
-int bit_extractor(char, memaddr_t);
+unsigned int bit_extractor(char, memaddr_t);
+
+void hex_binary_converter(memaddr_t, char[]);
 
 struct Block
 {
-	int byte_select;
-	int word_bits;
-	int row_bits;
-	int tag_bits;
+	unsigned int byte_select;
+	unsigned int word_bits;
+	unsigned int row_bits;
+	unsigned int tag_bits;
 	int data;
-	int valid;
-	int dirty;
+	unsigned int valid;
+	unsigned int dirty;
 };
 
 struct CacheObject

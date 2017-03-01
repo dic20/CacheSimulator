@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include "cachesim.h"
 
 /*
@@ -86,42 +87,26 @@ void setup_caches()
 }
 
 /* calculates size of the of all the bits for row, word, and tag */
-void bit_extractor_calculator(int* word, int* tag, int* index, int words_per_block, int num_blocks) {
-	int count = 0;
-	int power = 1;
-	int current = 2;
+void bit_extractor_calculator(int* word_bits, int* tag_bits, int* row_bits, int words_per_block, int num_blocks) {
 	int address_size = 32;
 
-	if( words_per_block != 1 ) {
-		while ( current <= words_per_block ) {
-			current*=2;
-			power++;
-		}
-	}
+	*row_bits = (int)ceil(log(num_blocks)/log(2));	/* calculates how many bits are needed to find each row */
 
-	*word = power;	/* number of bits needed for word indexing */
+	*word_bits = (int)ceil(log(words_per_block)/log(2));	/* number of bits needed for word indexing */
 
-	current = 2;
-	power = 1;
-
-	/* get 2^power that equals num_blocks to find how many bits are needed for row indexing */
-	while( current <= num_blocks ) {
-		current*=2;
-		power++;
-	}
-
-	*index = power;	/* number of bits needed to index all rows of cache */
-
-	*tag = address_size - *index - *word - 2;
+	*tag_bits = address_size - *row_bits - *word_bits - 2;
 }
 
 /* gets the bits you need from the address as an int
 the bits_needed char will be w for word, r for row, and t for tag*/
-int bit_extractor(char bits_needed, memaddr_t address) {
-	int word_mask = (1 << word_bits) - 1;
-	int row_mask = (1 << row_bits) - 1;
-	int tag_mask = (1 << tag_bits) - 1;
-	int bits;
+unsigned int bit_extractor(char bits_needed, memaddr_t address) {
+	unsigned int word_mask = (1 << word_bits) - 1;
+	unsigned int row_mask = (1 << row_bits) - 1;
+	unsigned int tag_mask = (1 << tag_bits) - 1;
+	unsigned int bits;
+	char binary[32];
+
+	hex_binary_converter(address, binary);
 
 	switch(bits_needed) {
 		case 'w':
@@ -138,11 +123,20 @@ int bit_extractor(char bits_needed, memaddr_t address) {
 	return bits;
 }
 
+void hex_binary_converter(memaddr_t address, char* binary) {
+	char hex[8];
+	for( int i = 0; i < 8; i++ ) {
+		hex[i] = address % 16;
+		address = address/16;
+		printf("value: %d\n", hex[i]);
+	}
+}
+
 void handle_access(AccessType type, memaddr_t address)
 {
-	int row_index;
-	int word_index;
-	int tag;
+	unsigned int row_index;
+	unsigned int word_index;
+	unsigned int tag;
 	/* This is where all the fun stuff happens! This function is called to
 	simulate a memory access. You figure out what type it is, and do all your
 	fun simulation stuff from here. */
@@ -161,9 +155,12 @@ void handle_access(AccessType type, memaddr_t address)
 				printf("Found block in I-cache\n");
 			} else {	/* else create block and add to cache */
 				printf("Did not find instruction in I-cache\n");
+				printf("tag %d\n", tag);
+				printf("current block tag %d\n", current_block.tag_bits);
 			}
 		} else {
 			compulsory_miss++;
+
 		}
 
 		/* These prints are just for debugging and should be removed. */
