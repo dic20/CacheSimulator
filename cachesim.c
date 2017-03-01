@@ -60,6 +60,8 @@ void setup_caches()
 	int words_per_block = icache_info.words_per_block;
 	int associativity = icache_info.associativity;
 
+	Block cacheArray[num_blocks];
+
 	/* direct-mapped cache setup */
 	if( associativity == 1 ) {
 
@@ -67,14 +69,14 @@ void setup_caches()
 
 			data_size = num_blocks * words_per_block * 4;	/*  number of bytes needed for data */
 
-			bit_extractor(&word_bits, &tag_bits, &row_bits, words_per_block);
+			bit_extractor_calculator(&word_bits, &tag_bits, &row_bits, words_per_block, num_blocks);
 
 				block.byte_select = 2;
 				block.row_bits = row_bits;
 				block.word_bits = word_bits;	/* not set associative */
 				block.tag_bits = tag_bits;
 
-				cache.cache[num_blocks];
+				cache.cache = cacheArray;
 		}
 	}
 
@@ -84,7 +86,7 @@ void setup_caches()
 }
 
 /* calculates size of the of all the bits for row, word, and tag */
-void bit_extractor_calculator(int* word, int* tag, int* index, int words_per_block) {
+void bit_extractor_calculator(int* word, int* tag, int* index, int words_per_block, int num_blocks) {
 	int count = 0;
 	int power = 1;
 	int current = 2;
@@ -113,7 +115,7 @@ void bit_extractor_calculator(int* word, int* tag, int* index, int words_per_blo
 	*tag = address_size - *index - *word - 2;
 }
 
-void handle_access(AccessType type, addr_t address)
+void handle_access(AccessType type, memaddr_t address)
 {
 	/* This is where all the fun stuff happens! This function is called to
 	simulate a memory access. You figure out what type it is, and do all your
@@ -194,7 +196,7 @@ void dump_cache_info()
 void read_trace_line(FILE* trace)
 {
 	char line[100];
-	addr_t address;
+	memaddr_t address;
 	char type;
 
 	fgets(line, sizeof(line), trace);

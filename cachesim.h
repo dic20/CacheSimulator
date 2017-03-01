@@ -42,7 +42,7 @@ typedef enum
 	Replacement_RANDOM,
 } ReplacementType;
 
-typedef unsigned long addr_t;
+typedef unsigned long memaddr_t;
 
 /*
 num_blocks is how many cache blocks there are. This is not how many words! And
@@ -97,7 +97,7 @@ void dump_cache_info();
 *
 *******************************************************************************/
 
-void bit_extractor_calculator(int*, int*, int*, int);
+void bit_extractor_calculator(int*, int*, int*, int, int);
 
 typedef struct
 {
