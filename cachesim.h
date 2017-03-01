@@ -99,25 +99,28 @@ void dump_cache_info();
 
 void bit_extractor_calculator(int*, int*, int*, int, int);
 
-typedef struct
+int bit_extractor(char, memaddr_t);
+
+struct Block
 {
 	int byte_select;
 	int word_bits;
 	int row_bits;
 	int tag_bits;
+	int data;
 	int valid;
 	int dirty;
-} Block;
+};
 
-typedef struct
+struct CacheObject
 {
 	struct Block **cache2;
 	struct Block *cache;
-} CacheObject;	/* cache itself will be a 2D array of block structs */
+} ;	/* cache itself will be a 2D array of block structs */
 
-typedef struct
+struct Stats
 {
 
-} Stats;
+};
 
 #endif

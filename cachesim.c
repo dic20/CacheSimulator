@@ -45,13 +45,14 @@ CacheInfo struct for docs on what's inside it. Have a look at dump_cache_info
 for an example of how to check the members. */
 static CacheInfo icache_info;
 static CacheInfo dcache_info[3];
-static Block block;
-static CacheObject cache;
+struct Block block;
+struct CacheObject cache;
 int byte_bits;
 int data_size;
 int tag_bits;
 int word_bits;
 int row_bits;
+int compulsory_miss = 0;
 
 void setup_caches()
 {
@@ -60,7 +61,11 @@ void setup_caches()
 	int words_per_block = icache_info.words_per_block;
 	int associativity = icache_info.associativity;
 
-	Block cacheArray[num_blocks];
+
+	struct Block cacheArray[num_blocks];
+	for( int i = 0; i < num_blocks; i++ ) {	/* initialize all elements of cache to NULL */
+		cacheArray[i].tag_bits = NULL;
+	}
 
 	/* direct-mapped cache setup */
 	if( associativity == 1 ) {
@@ -71,12 +76,7 @@ void setup_caches()
 
 			bit_extractor_calculator(&word_bits, &tag_bits, &row_bits, words_per_block, num_blocks);
 
-				block.byte_select = 2;
-				block.row_bits = row_bits;
-				block.word_bits = word_bits;	/* not set associative */
-				block.tag_bits = tag_bits;
-
-				cache.cache = cacheArray;
+			cache.cache = cacheArray;
 		}
 	}
 
@@ -115,21 +115,66 @@ void bit_extractor_calculator(int* word, int* tag, int* index, int words_per_blo
 	*tag = address_size - *index - *word - 2;
 }
 
+/* gets the bits you need from the address as an int
+the bits_needed char will be w for word, r for row, and t for tag*/
+int bit_extractor(char bits_needed, memaddr_t address) {
+	int word_mask = (1 << word_bits) - 1;
+	int row_mask = (1 << row_bits) - 1;
+	int tag_mask = (1 << tag_bits) - 1;
+	int bits;
+
+	switch(bits_needed) {
+		case 'w':
+		bits = (address >> word_bits) & word_mask;
+		break;
+		case 'r':
+		bits = (address >> row_bits) & row_mask;
+		break;
+		case 't':
+		bits = (address >> tag_bits) & tag_mask;
+		break;
+	}
+
+	return bits;
+}
+
 void handle_access(AccessType type, memaddr_t address)
 {
+	int row_index;
+	int word_index;
+	int tag;
 	/* This is where all the fun stuff happens! This function is called to
 	simulate a memory access. You figure out what type it is, and do all your
 	fun simulation stuff from here. */
 	switch(type)
 	{
 		case Access_I_FETCH:
+		/* send address throuhg bit_extractor */
+		row_index = bit_extractor('r', address);
+		word_index = bit_extractor('w', address);
+		tag = bit_extractor('t', address);
+
+		/* if found return block */
+		if( cache.cache[row_index].tag_bits != NULL ) {
+			struct Block current_block = cache.cache[row_index];
+			if( current_block.tag_bits == tag ) {
+				printf("Found block in I-cache\n");
+			} else {	/* else create block and add to cache */
+				printf("Did not find instruction in I-cache\n");
+			}
+		} else {
+			compulsory_miss++;
+		}
+
 		/* These prints are just for debugging and should be removed. */
 		printf("I_FETCH at %08lx\n", address);
 		break;
 		case Access_D_READ:
+
 		printf("D_READ at %08lx\n", address);
 		break;
 		case Access_D_WRITE:
+
 		printf("D_WRITE at %08lx\n", address);
 		break;
 	}
