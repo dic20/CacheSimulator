@@ -58,27 +58,24 @@ void setup_caches()
 	/* Set up your caches here! */
 	int num_blocks = icache_info.num_blocks;
 	int words_per_block = icache_info.words_per_block;
-	int associativity = ichache_info.associativity;
+	int associativity = icache_info.associativity;
 
 	/* direct-mapped cache setup */
 	if( associativity == 1 ) {
 
-		if( num_blocks == 0 ) break;	/* cache level is disabled */
+		if( num_blocks != 0 ) {
 
-		data_size = num_blocks * words_per_block * 4;
+			data_size = num_blocks * words_per_block * 4;	/*  number of bytes needed for data */
 
-		bit_extractor(&word_bits, &tag_bits, &row_bits);
+			bit_extractor(&word_bits, &tag_bits, &row_bits, words_per_block);
 
-		block = {
-			.byte_select = 2;
-			.row_bits = row_bits;	/* not set associative */
-			.word_bits = word_bits;
-			.tag_bits = tag_bits;
-		};
-		
-		cache = {
-			.cache[num_blocks];
-		};
+				block.byte_select = 2;
+				block.row_bits = row_bits;
+				block.word_bits = word_bits;	/* not set associative */
+				block.tag_bits = tag_bits;
+
+				cache.cache[num_blocks];
+		}
 	}
 
 	/* This call to dump_cache_info is just to show some debugging information
@@ -87,8 +84,33 @@ void setup_caches()
 }
 
 /* calculates size of the of all the bits for row, word, and tag */
-void bit_extractor(int* word_bits, int* tag_bits, int* row_bits) {
+void bit_extractor_calculator(int* word, int* tag, int* index, int words_per_block) {
+	int count = 0;
+	int power = 1;
+	int current = 2;
+	int address_size = 32;
 
+	if( words_per_block != 1 ) {
+		while ( current <= words_per_block ) {
+			current*=2;
+			power++;
+		}
+	}
+
+	*word = power;	/* number of bits needed for word indexing */
+
+	current = 2;
+	power = 1;
+
+	/* get 2^power that equals num_blocks to find how many bits are needed for row indexing */
+	while( current <= num_blocks ) {
+		current*=2;
+		power++;
+	}
+
+	*index = power;	/* number of bits needed to index all rows of cache */
+
+	*tag = address_size - *index - *word - 2;
 }
 
 void handle_access(AccessType type, addr_t address)
