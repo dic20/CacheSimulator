@@ -104,9 +104,7 @@ unsigned int bit_extractor(char bits_needed, memaddr_t address) {
 	unsigned int row_mask = (1 << row_bits) - 1;
 	unsigned int tag_mask = (1 << tag_bits) - 1;
 	unsigned int bits;
-	char binary[32];
-
-	hex_binary_converter(address, binary);
+	char binary[32][5];
 
 	switch(bits_needed) {
 		case 'w':
@@ -117,19 +115,87 @@ unsigned int bit_extractor(char bits_needed, memaddr_t address) {
 		break;
 		case 't':
 		bits = (address >> tag_bits) & tag_mask;
+		hex_binary_converter(address, binary);
 		break;
 	}
 
 	return bits;
 }
 
-void hex_binary_converter(memaddr_t address, char* binary) {
-	char hex[8];
+void hex_binary_converter(memaddr_t address, char** binary) {
+	/* turn every hex character into 4 binary bits */
+	char* temp;
 	for( int i = 0; i < 8; i++ ) {
-		hex[i] = address % 16;
+		switch( address % 16 ) {	/* switch lsb */
+			case 0:
+				temp = "0000";
+				binary[i] = temp;
+				break;
+			case 1:
+				temp = "0001";
+				binary[i] = temp;
+				break;
+			case 2:
+				temp = "0010";
+				binary[i] = temp;
+				break;
+			case 3:
+				temp = "0011";
+				binary[i] = temp;
+				break;
+			case 4:
+				temp = "0100";
+				binary[i] = temp;
+				break;
+			case 5:
+				temp = "0101";
+				binary[i] = temp;
+				break;
+			case 6:
+				temp = "0110";
+				binary[i] = temp;
+				break;
+			case 7:
+				temp = "0111";
+				binary[i] = temp;
+				break;
+			case 8:
+				temp = "1000";
+				binary[i] = temp;
+				break;
+			case 9:
+				temp = "1001";
+				binary[i] = temp;
+				break;
+			case 10:
+				temp = "1010";
+				binary[i] = temp;
+				break;
+			case 11:
+				temp = "1011";
+				binary[i] = temp;
+				break;
+			case 12:
+				temp = "1100";
+				break;
+			case 13:
+				temp = "1101";
+				binary[i] = temp;
+				break;
+			case 14:
+				temp = "1110";
+				binary[i] = temp;
+				break;
+			case 15:
+				temp = "1111";
+				binary[i] = temp;
+				break;
+		}
 		address = address/16;
-		printf("value: %d\n", hex[i]);
+		printf("value: %s\n", binary[i]);
 	}
+
+
 }
 
 void handle_access(AccessType type, memaddr_t address)
