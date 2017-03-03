@@ -103,6 +103,8 @@ unsigned int bit_extractor(char, memaddr_t);
 
 void hex_binary_converter(memaddr_t, char**);
 
+unsigned int bit_value_extractor(char, memaddr_t);
+
 struct Block
 {
 	unsigned int byte_select;
