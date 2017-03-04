@@ -54,7 +54,8 @@ int tag_bits;
 int word_bits;
 int row_bits;
 int compulsory_miss = 0;
-char binary[32][5];
+char binary[8][5];
+char binary_address[32];
 
 void setup_caches()
 {
@@ -98,34 +99,12 @@ void bit_extractor_calculator(int* word_bits, int* tag_bits, int* row_bits, int 
 	*tag_bits = address_size - *row_bits - *word_bits - 2;
 }
 
-/* gets the bits you need from the address as an int
-the bits_needed char will be w for word, r for row, and t for tag*/
-unsigned int bit_extractor(char bits_needed, memaddr_t address) {
-	unsigned int word_mask = (1 << word_bits) - 1;
-	unsigned int row_mask = (1 << row_bits) - 1;
-	unsigned int tag_mask = (1 << tag_bits) - 1;
-	unsigned int bits;
-
-	switch(bits_needed) {
-		case 'w':
-			bits = (address >> word_bits) & word_mask;
-			break;
-		case 'r':
-			bits = (address >> row_bits) & row_mask;
-			break;
-		case 't':
-			bits = (address >> tag_bits) & tag_mask;
-			break;
-	}
-
-	return bits;
-}
-
 unsigned int bit_value_extractor(char bit_type, memaddr_t address) {
-	unsigned int value;
+	char value[32];
 	int word_index_start = 2;
 	int row_index_start;
 	int tag_index_start;
+	int j = 0;
 
 	row_index_start = word_index_start + word_bits-1; /* -1 because don't want to count start index twice */
 	tag_index_start = row_index_start + row_bits-1;
@@ -133,25 +112,27 @@ unsigned int bit_value_extractor(char bit_type, memaddr_t address) {
 	switch(bit_type) {
 		case 'w':
 			for( int i = word_index_start; i < row_index_start; i++ ) {
-				value += *binary[i];
+				value[j] += (unsigned int)binary[i];
+				j += 4;
 			}
 			break;
 		case 'r':
 			for( int i = row_index_start; i < tag_index_start; i++ ) {
-				value += *binary[i];
+				value[j] += (unsigned int)binary[i];
+				j += 4;
 			}
 			break;
 		case 't':
-			for( int i = tag_index_start; i < 32; i++ ) {
-				value += (unsigned int)*binary[i];
-				printf("tag2_val: %d\n", value);
+			for( int i = tag_index_start; i < 8; i++ ) {
+				value[j] += (unsigned int)binary[i];
+				j += 4;
 			}
 			break;
 	}
-	return value;
+	return value[j];
 }
 
-void hex_binary_converter(memaddr_t address, char** binary) {
+void hex_binary_converter(memaddr_t address, char** binary, char * binary_address) {
 	/* turn every hex character into 4 binary bits */
 	char* temp;
 	for( int i = 0; i < 8; i++ ) {
@@ -223,30 +204,31 @@ void hex_binary_converter(memaddr_t address, char** binary) {
 				break;
 		}
 		address = address/16;
-		/*printf("value: %s\n", binary[i]);*/
 	}
 
-
+	//take the binary[8][5] array and convert to a binary_address[32]
+	int z = 0;
+	for( int i = 0; i < 8; i++ ) {
+		for( int j = 3; j >= 0; j-- ) {
+			binary_address[z] = binary[i][j];
+			printf("binary_address[%d]: %c\n", z, binary_address[z]);
+			z++;
+		}
+	}
 }
 
 void handle_access(AccessType type, memaddr_t address)
 {
-	unsigned int row_index;
-	unsigned int word_index;
-	unsigned int tag;
+	unsigned int row_index =0;
+	unsigned int word_index =0;
+	unsigned int tag =0;
 	/* This is where all the fun stuff happens! This function is called to
 	simulate a memory access. You figure out what type it is, and do all your
 	fun simulation stuff from here. */
-	hex_binary_converter(address, binary);
+	hex_binary_converter(address, binary, binary_address);
 	switch(type)
 	{
 		case Access_I_FETCH:
-		/* send address throuhg bit_extractor */
-		row_index = bit_extractor('r', address);
-		word_index = bit_extractor('w', address);
-		tag = bit_extractor('t', address);
-		int tag2 = bit_value_extractor('t', address);
-		printf("tag2: %d\n", tag2);
 
 		/* if found return block */
 		if( cache.cache[row_index].tag_bits != NULL ) {
@@ -255,8 +237,6 @@ void handle_access(AccessType type, memaddr_t address)
 				printf("Found block in I-cache\n");
 			} else {	/* else create block and add to cache */
 				printf("Did not find instruction in I-cache\n");
-				printf("tag %d\n", tag);
-				printf("current block tag %d\n", current_block.tag_bits);
 			}
 		} else {
 			compulsory_miss++;

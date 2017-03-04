@@ -99,9 +99,7 @@ void dump_cache_info();
 
 void bit_extractor_calculator(int*, int*, int*, int, int);
 
-unsigned int bit_extractor(char, memaddr_t);
-
-void hex_binary_converter(memaddr_t, char**);
+void hex_binary_converter(memaddr_t, char**, char*);
 
 unsigned int bit_value_extractor(char, memaddr_t);
 
