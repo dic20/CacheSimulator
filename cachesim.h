@@ -103,6 +103,8 @@ void hex_binary_converter(memaddr_t, char**, char*);
 
 void address_decompress(char, char*, char*);
 
+int row_index_converter(char*);
+
 struct Block
 {
 	char* byte_select;

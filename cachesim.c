@@ -195,7 +195,7 @@ void address_decompress(char index, char* array_to_fill, char* binary_address) {
 	{
 		case 'r':
 			stop = 32-tag_bits-row_bits-1;
-			for( int i = 31-tag_bits; i > stop; i-- ) {
+			for( int i = 32-tag_bits; i > stop; i-- ) {
 				array_to_fill[j] = binary_address[i];
 				printf("row bit %d: %c\n", j, array_to_fill[j]);
 				j++;
@@ -223,6 +223,22 @@ void address_decompress(char index, char* array_to_fill, char* binary_address) {
 	}
 }
 
+int row_index_converter(char* row) {
+	int row_index = 0;
+	int base = 2;
+	int position = 0;
+	//max row index size = 2^row_bits
+	for( int i = row_bits; i > 0; i-- ) {
+		printf("row[i]: %c\n", row[i]);
+		if( row[i] == '1') {
+			row_index += ( 1 * pow(base, position) );
+		}
+		position++;
+	}
+
+	return row_index;
+}
+
 void handle_access(AccessType type, memaddr_t address)
 {
 	int row_index = 0;
@@ -243,7 +259,8 @@ void handle_access(AccessType type, memaddr_t address)
 	address_decompress('r', row, binary_address);
 
 	//convert row[] to row_index
-	
+	row_index = row_index_converter(row);
+	printf("row_index: %d\n", row_index);
 
 	/* This is where all the fun stuff happens! This function is called to
 	simulate a memory access. You figure out what type it is, and do all your
