@@ -101,17 +101,17 @@ void bit_extractor_calculator(int*, int*, int*, int, int);
 
 void hex_binary_converter(memaddr_t, char**, char*);
 
-unsigned int bit_value_extractor(char, memaddr_t);
+void address_decompress(char, char*, char*);
 
 struct Block
 {
-	unsigned int byte_select;
-	unsigned int word_bits;
-	unsigned int row_bits;
-	unsigned int tag_bits;
+	char* byte_select;
+	char* word_bits;
+	char* row_bits;
+	char* tag_bits;
 	int data;
-	unsigned int valid;
-	unsigned int dirty;
+	int valid;
+	int dirty;
 };
 
 struct CacheObject

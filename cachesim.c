@@ -99,44 +99,11 @@ void bit_extractor_calculator(int* word_bits, int* tag_bits, int* row_bits, int 
 	*tag_bits = address_size - *row_bits - *word_bits - 2;
 }
 
-unsigned int bit_value_extractor(char bit_type, memaddr_t address) {
-	char value[32];
-	int word_index_start = 2;
-	int row_index_start;
-	int tag_index_start;
-	int j = 0;
-
-	row_index_start = word_index_start + word_bits-1; /* -1 because don't want to count start index twice */
-	tag_index_start = row_index_start + row_bits-1;
-
-	switch(bit_type) {
-		case 'w':
-			for( int i = word_index_start; i < row_index_start; i++ ) {
-				value[j] += (unsigned int)binary[i];
-				j += 4;
-			}
-			break;
-		case 'r':
-			for( int i = row_index_start; i < tag_index_start; i++ ) {
-				value[j] += (unsigned int)binary[i];
-				j += 4;
-			}
-			break;
-		case 't':
-			for( int i = tag_index_start; i < 8; i++ ) {
-				value[j] += (unsigned int)binary[i];
-				j += 4;
-			}
-			break;
-	}
-	return value[j];
-}
-
 void hex_binary_converter(memaddr_t address, char** binary, char * binary_address) {
 	/* turn every hex character into 4 binary bits */
 	char* temp;
 	for( int i = 0; i < 8; i++ ) {
-		printf("converting...\n");
+		//printf("converting...\n");
 		switch( address % 16 ) {	/* switch lsb */
 			case 0:
 				temp = "0000";
@@ -211,32 +178,86 @@ void hex_binary_converter(memaddr_t address, char** binary, char * binary_addres
 	for( int i = 0; i < 8; i++ ) {
 		for( int j = 3; j >= 0; j-- ) {
 			binary_address[z] = binary[i][j];
-			printf("binary_address[%d]: %c\n", z, binary_address[z]);
+			//printf("binary_address[%d]: %c\n", z, binary_address[z]);
 			z++;
 		}
 	}
 }
 
+/*
+fills an array with the appropriate bits
+fills array based on precalculated index and char index
+*/
+void address_decompress(char index, char* array_to_fill, char* binary_address) {
+	int j = 0;
+	int stop;
+	switch(index)
+	{
+		case 'r':
+			stop = 32-tag_bits-row_bits-1;
+			for( int i = 31-tag_bits; i > stop; i-- ) {
+				array_to_fill[j] = binary_address[i];
+				printf("row bit %d: %c\n", j, array_to_fill[j]);
+				j++;
+			}
+			printf("row length %d\n", row_bits);
+			break;
+		case 't':
+			stop = 32-tag_bits-1;
+			for( int i = 31; i > stop; i-- ) {
+				array_to_fill[j] = binary_address[i];
+				//printf("tag bit %d: %c\n", j, array_to_fill[j]);
+				j++;
+			}
+			printf("tag length %d\n", tag_bits);
+			break;
+		case 'w':
+			stop = 1;
+			for( int i = 1+word_bits; i > stop; i-- ) {
+				array_to_fill[j] = binary_address[i];
+				//printf("word bit %d: %c\n", j, array_to_fill[j]);
+				j++;
+			}
+			printf("word length %d\n", word_bits);
+			break;
+	}
+}
+
 void handle_access(AccessType type, memaddr_t address)
 {
-	unsigned int row_index =0;
-	unsigned int word_index =0;
-	unsigned int tag =0;
+	int row_index = 0;
+	char row[row_bits+1];
+	char word[word_bits+1];
+	char tag[tag_bits+1];
+
+	//convert address from hex to binary and store it in binary_address
+	hex_binary_converter(address, binary, binary_address);
+
+	// Fill tag array
+	address_decompress('t', tag, binary_address);
+
+	//fill word array
+	address_decompress('w', word, binary_address);
+
+	//fill row array
+	address_decompress('r', row, binary_address);
+
+	//convert row[] to row_index
+	
+
 	/* This is where all the fun stuff happens! This function is called to
 	simulate a memory access. You figure out what type it is, and do all your
 	fun simulation stuff from here. */
-	hex_binary_converter(address, binary, binary_address);
 	switch(type)
 	{
 		case Access_I_FETCH:
 
 		/* if found return block */
-		if( cache.cache[row_index].tag_bits != NULL ) {
-			struct Block current_block = cache.cache[row_index];
-			if( current_block.tag_bits == tag ) {
+		if( cache.cache[row_index].tag_bits != NULL ) {	// every block will have a tag
+			if( strcmp(cache.cache[row_index].tag_bits, tag) ) {
 				printf("Found block in I-cache\n");
 			} else {	/* else create block and add to cache */
-				printf("Did not find instruction in I-cache\n");
+				printf("Did not find instruction with correct tag in I-cache\n");
 			}
 		} else {
 			compulsory_miss++;
