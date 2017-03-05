@@ -47,7 +47,7 @@ for an example of how to check the members. */
 static CacheInfo icache_info;
 static CacheInfo dcache_info[3];
 struct Block block;
-struct CacheObject cache;
+struct Wrapper wrapper;
 int byte_bits;
 int data_size;
 int tag_bits;
@@ -56,6 +56,8 @@ int row_bits;
 int compulsory_miss = 0;
 char binary[8][5];
 char binary_address[32];
+int cache_size;
+
 
 void setup_caches()
 {
@@ -63,12 +65,6 @@ void setup_caches()
 	int num_blocks = icache_info.num_blocks;
 	int words_per_block = icache_info.words_per_block;
 	int associativity = icache_info.associativity;
-
-
-	struct Block cacheArray[num_blocks];
-	for( int i = 0; i < num_blocks; i++ ) {	/* initialize all elements of cache to NULL */
-		cacheArray[i].tag_bits = NULL;
-	}
 
 	/* direct-mapped cache setup */
 	if( associativity == 1 ) {
@@ -79,7 +75,12 @@ void setup_caches()
 
 			bit_extractor_calculator(&word_bits, &tag_bits, &row_bits, words_per_block, num_blocks);
 
-			cache.cache = cacheArray;
+			struct Block cache[num_blocks];
+			for( int i = 0; i < num_blocks; i++ ) {
+				cache[i].tag_bits = NULL;
+			}
+			wrapper.cache = cache;
+			cache_size = num_blocks;
 		}
 	}
 
@@ -197,10 +198,10 @@ void address_decompress(char index, char* array_to_fill, char* binary_address) {
 			stop = 32-tag_bits-row_bits-1;
 			for( int i = 32-tag_bits; i > stop; i-- ) {
 				array_to_fill[j] = binary_address[i];
-				printf("row bit %d: %c\n", j, array_to_fill[j]);
+				//printf("row bit %d: %c\n", j, array_to_fill[j]);
 				j++;
 			}
-			printf("row length %d\n", row_bits);
+			//printf("row length %d\n", row_bits);
 			break;
 		case 't':
 			stop = 32-tag_bits-1;
@@ -209,7 +210,7 @@ void address_decompress(char index, char* array_to_fill, char* binary_address) {
 				//printf("tag bit %d: %c\n", j, array_to_fill[j]);
 				j++;
 			}
-			printf("tag length %d\n", tag_bits);
+			//printf("tag length %d\n", tag_bits);
 			break;
 		case 'w':
 			stop = 1;
@@ -218,7 +219,7 @@ void address_decompress(char index, char* array_to_fill, char* binary_address) {
 				//printf("word bit %d: %c\n", j, array_to_fill[j]);
 				j++;
 			}
-			printf("word length %d\n", word_bits);
+			//printf("word length %d\n", word_bits);
 			break;
 	}
 }
@@ -229,7 +230,7 @@ int row_index_converter(char* row) {
 	int position = 0;
 	//max row index size = 2^row_bits
 	for( int i = row_bits; i > 0; i-- ) {
-		printf("row[i]: %c\n", row[i]);
+		//printf("row[i]: %c\n", row[i]);
 		if( row[i] == '1') {
 			row_index += ( 1 * pow(base, position) );
 		}
@@ -237,6 +238,22 @@ int row_index_converter(char* row) {
 	}
 
 	return row_index;
+}
+
+//adds new block to cache.cache[] at row_index, sets valid = 1, dirty = 0
+void add_block(char* temp_word, char* temp_row, char* temp_tag, int row_index) {
+	if( row_index <= cache_size ) {
+		wrapper.cache[row_index].word_bits = temp_word;
+		wrapper.cache[row_index].row_bits = temp_row;
+		wrapper.cache[row_index].tag_bits = temp_tag;
+		wrapper.cache[row_index].valid = 1;
+		wrapper.cache[row_index].dirty = 0;
+	}
+	else {
+		printf("TOO SMALL\n");
+		printf("row_index: %d\n", row_index);
+		printf("Cache_size: %d\n", cache_size);
+	}
 }
 
 void handle_access(AccessType type, memaddr_t address)
@@ -257,10 +274,10 @@ void handle_access(AccessType type, memaddr_t address)
 
 	//fill row array
 	address_decompress('r', row, binary_address);
-
+	printf("Row: %s\n", row);
 	//convert row[] to row_index
 	row_index = row_index_converter(row);
-	printf("row_index: %d\n", row_index);
+	//printf("row_index: %d\n", row_index);
 
 	/* This is where all the fun stuff happens! This function is called to
 	simulate a memory access. You figure out what type it is, and do all your
@@ -268,21 +285,35 @@ void handle_access(AccessType type, memaddr_t address)
 	switch(type)
 	{
 		case Access_I_FETCH:
-
-		/* if found return block */
-		if( cache.cache[row_index].tag_bits != NULL ) {	// every block will have a tag
-			if( strcmp(cache.cache[row_index].tag_bits, tag) ) {
-				printf("Found block in I-cache\n");
-			} else {	/* else create block and add to cache */
-				printf("Did not find instruction with correct tag in I-cache\n");
-			}
-		} else {
-			compulsory_miss++;
-
-		}
-
-		/* These prints are just for debugging and should be removed. */
 		printf("I_FETCH at %08lx\n", address);
+		printf("row index: %d\n", row_index);
+		if( wrapper.cache[row_index].tag_bits != NULL ) {
+			if( !strcmp(wrapper.cache[row_index].tag_bits, tag) ) {
+				printf("Found block in I-cache\n");
+			} else {
+				char temp_word[sizeof(word)];
+				strcpy(temp_word, word);
+				char temp_row[sizeof(row)];
+				strcpy(temp_row, row);
+				char temp_tag[sizeof(tag)];
+				strcpy(temp_tag, tag);
+				add_block(temp_word, temp_row, temp_tag, row_index);
+				printf("added new block\n");
+			}
+		}else {
+			compulsory_miss++;
+			printf("compulsory_miss: %d\n", compulsory_miss);
+			char temp_word[sizeof(word)];
+			strcpy(temp_word, word);
+			char temp_row[sizeof(row)];
+			strcpy(temp_row, row);
+			char temp_tag[sizeof(tag)];
+			strcpy(temp_tag, tag);
+			add_block(temp_word, temp_row, temp_tag, row_index);
+			printf("added new block\n");
+		}
+		printf("compulsory_miss: %d\n", compulsory_miss);
+		/* These prints are just for debugging and should be removed. */
 		break;
 		case Access_D_READ:
 

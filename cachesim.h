@@ -105,9 +105,11 @@ void address_decompress(char, char*, char*);
 
 int row_index_converter(char*);
 
+void add_block(char*, char*, char*, int);
+
 struct Block
 {
-	char* byte_select;
+	char byte_select;
 	char* word_bits;
 	char* row_bits;
 	char* tag_bits;
@@ -116,11 +118,10 @@ struct Block
 	int dirty;
 };
 
-struct CacheObject
+struct Wrapper
 {
-	struct Block **cache2;
-	struct Block *cache;
-} ;	/* cache itself will be a 2D array of block structs */
+	struct Block* cache;
+};
 
 struct Stats
 {
