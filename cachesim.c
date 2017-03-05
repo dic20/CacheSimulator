@@ -242,7 +242,7 @@ int row_index_converter(char* row) {
 
 //adds new block to cache.cache[] at row_index, sets valid = 1, dirty = 0
 void add_block(char* temp_word, char* temp_row, char* temp_tag, int row_index) {
-	if( row_index <= cache_size ) {
+	if( row_index < cache_size ) {
 		wrapper.cache[row_index].word_bits = temp_word;
 		wrapper.cache[row_index].row_bits = temp_row;
 		wrapper.cache[row_index].tag_bits = temp_tag;
@@ -300,9 +300,9 @@ void handle_access(AccessType type, memaddr_t address)
 				add_block(temp_word, temp_row, temp_tag, row_index);
 				printf("added new block\n");
 			}
-		}else {
+		} else {
 			compulsory_miss++;
-			printf("compulsory_miss: %d\n", compulsory_miss);
+			printf("compulsory_miss1: %d\n", compulsory_miss);
 			char temp_word[sizeof(word)];
 			strcpy(temp_word, word);
 			char temp_row[sizeof(row)];
@@ -312,7 +312,7 @@ void handle_access(AccessType type, memaddr_t address)
 			add_block(temp_word, temp_row, temp_tag, row_index);
 			printf("added new block\n");
 		}
-		printf("compulsory_miss: %d\n", compulsory_miss);
+		printf("compulsory_miss2: %d\n", compulsory_miss);
 		/* These prints are just for debugging and should be removed. */
 		break;
 		case Access_D_READ:
