@@ -105,7 +105,11 @@ void address_decompress(char, char*, char*);
 
 int row_index_converter(char*);
 
+int word_index_converter(char*);
+
 void add_block(char*, char*, char*, int);
+
+void replace_block(ReplacementType, char*, char*, char*, int);
 
 struct Block
 {
@@ -113,19 +117,20 @@ struct Block
 	char* word_bits;
 	char* row_bits;
 	char* tag_bits;
-	int data;
 	int valid;
 	int dirty;
+	int used_last;
 };
 
 struct Wrapper
 {
 	struct Block* cache;
+	struct Block** cache2D;
 };
 
 struct Stats
 {
-
+	int compulsory_miss;
 };
 
 #endif

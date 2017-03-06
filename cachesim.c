@@ -57,29 +57,50 @@ int compulsory_miss = 0;
 char binary[8][5];
 char binary_address[32];
 int cache_size;
-
+int mem_reads = 0;
+int conflict_miss = 0;
+int wpb;
+int read_cache = 0;
+float miss_rate = 0.0;
+int associativity;
 
 void setup_caches()
 {
 	/* Set up your caches here! */
 	int num_blocks = icache_info.num_blocks;
 	int words_per_block = icache_info.words_per_block;
-	int associativity = icache_info.associativity;
+	associativity = icache_info.associativity;
+	wpb = words_per_block;
+
+	srand(num_blocks);
 
 	/* direct-mapped cache setup */
 	if( associativity == 1 ) {
 
 		if( num_blocks != 0 ) {
 
-			data_size = num_blocks * words_per_block * 4;	/*  number of bytes needed for data */
+			bit_extractor_calculator(&word_bits, &tag_bits, &row_bits, words_per_block, num_blocks);
+
+			wrapper.cache = (struct Block *)malloc(sizeof(struct Block)*num_blocks);
+			for( int i = 0; i < num_blocks; i++ ) {
+				wrapper.cache[i].tag_bits = '\0';
+			}
+			cache_size = num_blocks;
+		}
+	} else {	//not direct-mapped setup
+
+		if( num_blocks != 0 ) {
 
 			bit_extractor_calculator(&word_bits, &tag_bits, &row_bits, words_per_block, num_blocks);
 
-			struct Block cache[num_blocks];
+			struct Block cache2[num_blocks][associativity];
 			for( int i = 0; i < num_blocks; i++ ) {
-				cache[i].tag_bits = NULL;
+				for( int j = 0; j < associativity; j++ ) {
+					cache2[i][j].tag_bits = '\0';
+					cache2[i][j].used_last = 0;
+				}
 			}
-			wrapper.cache = cache;
+			wrapper.cache2D = cache2;
 			cache_size = num_blocks;
 		}
 	}
@@ -201,6 +222,7 @@ void address_decompress(char index, char* array_to_fill, char* binary_address) {
 				//printf("row bit %d: %c\n", j, array_to_fill[j]);
 				j++;
 			}
+			array_to_fill[stop] = '\0';
 			//printf("row length %d\n", row_bits);
 			break;
 		case 't':
@@ -210,6 +232,7 @@ void address_decompress(char index, char* array_to_fill, char* binary_address) {
 				//printf("tag bit %d: %c\n", j, array_to_fill[j]);
 				j++;
 			}
+			array_to_fill[stop] = '\0';
 			//printf("tag length %d\n", tag_bits);
 			break;
 		case 'w':
@@ -219,6 +242,7 @@ void address_decompress(char index, char* array_to_fill, char* binary_address) {
 				//printf("word bit %d: %c\n", j, array_to_fill[j]);
 				j++;
 			}
+			array_to_fill[stop] = '\0';
 			//printf("word length %d\n", word_bits);
 			break;
 	}
@@ -240,25 +264,84 @@ int row_index_converter(char* row) {
 	return row_index;
 }
 
-//adds new block to cache.cache[] at row_index, sets valid = 1, dirty = 0
+int word_index_converter(char* word) {
+	int word_index = 0;
+	int base = 2;
+	int position = 0;
+
+	for( int i = word_bits; i > 0; i-- ) {
+		if( word[i] == '1' ) {
+			word_index += ( 1 * pow(base, position) );
+		}
+		position++;
+	}
+	return word_index;
+}
+
+/*adds new block to cache.cache[] at row_index, sets valid = 1, dirty = 0
+simulates pulling from memory*/
 void add_block(char* temp_word, char* temp_row, char* temp_tag, int row_index) {
 	if( row_index < cache_size ) {
 		wrapper.cache[row_index].word_bits = temp_word;
 		wrapper.cache[row_index].row_bits = temp_row;
 		wrapper.cache[row_index].tag_bits = temp_tag;
-		wrapper.cache[row_index].valid = 1;
+		wrapper.cache[row_index].valid = 0;
 		wrapper.cache[row_index].dirty = 0;
-	}
-	else {
+		printf("added new block\n");
+	} else {
 		printf("TOO SMALL\n");
 		printf("row_index: %d\n", row_index);
 		printf("Cache_size: %d\n", cache_size);
 	}
 }
 
+/* replace block using specified replacement type */
+void replace_block(ReplacementType R, char* temp_word, char* temp_row, char* temp_tag, int row_index) {
+	int Replace_Block_index = 0;
+	struct Block Replace_Block = wrapper.cache2D[row_index][0];
+	switch(R)
+	{
+		case Replacement_RANDOM:
+			if( row_index < cache_size ) {
+				wrapper.cache2D[row_index][rand()].word_bits = temp_word;
+				wrapper.cache2D[row_index][rand()].row_bits = temp_row;
+				wrapper.cache2D[row_index][rand()].tag_bits = temp_tag;
+				wrapper.cache2D[row_index][rand()].valid = 0;
+				wrapper.cache2D[row_index][rand()].dirty = 0;
+				printf("Replaced block at random index: %d\n", rand());
+			}	else {
+				printf("TOO SMALL\n");
+				printf("row_index: %d\n", row_index);
+				printf("Cache_size: %d\n", cache_size);
+			}
+		break;
+		case Replacement_LRU:
+			for( int i = 0; i < associativity-1; i++ ) {	// find the block to replace, lowest used_last means LRu
+				if( Replace_Block.used_last > wrapper.cache2D[row_index][i+1].used_last ) {
+					Replace_Block = wrapper.cache2D[row_index][i];
+					Replace_Block_index++;
+				}
+			}
+			if( row_index < cache_size ) {
+				wrapper.cache2D[row_index][Replace_Block_index].word_bits = temp_word;
+				wrapper.cache2D[row_index][Replace_Block_index].row_bits = temp_row;
+				wrapper.cache2D[row_index][Replace_Block_index].tag_bits = temp_tag;
+				wrapper.cache2D[row_index][Replace_Block_index].valid = 0;
+				wrapper.cache2D[row_index][Replace_Block_index].dirty = 0;
+				printf("LRU Replace at index: %d\n", Replace_Block_index);
+			}	else {
+				printf("TOO SMALL\n");
+				printf("row_index: %d\n", row_index);
+				printf("Cache_size: %d\n", cache_size);
+			}
+		break;
+	}
+}
+
 void handle_access(AccessType type, memaddr_t address)
 {
 	int row_index = 0;
+	int word_index = 0;
 	char row[row_bits+1];
 	char word[word_bits+1];
 	char tag[tag_bits+1];
@@ -274,10 +357,12 @@ void handle_access(AccessType type, memaddr_t address)
 
 	//fill row array
 	address_decompress('r', row, binary_address);
-	printf("Row: %s\n", row);
+
 	//convert row[] to row_index
 	row_index = row_index_converter(row);
-	//printf("row_index: %d\n", row_index);
+
+	//convert word[] to word_index
+	word_index = word_index_converter(word);
 
 	/* This is where all the fun stuff happens! This function is called to
 	simulate a memory access. You figure out what type it is, and do all your
@@ -286,33 +371,54 @@ void handle_access(AccessType type, memaddr_t address)
 	{
 		case Access_I_FETCH:
 		printf("I_FETCH at %08lx\n", address);
-		printf("row index: %d\n", row_index);
-		if( wrapper.cache[row_index].tag_bits != NULL ) {
-			if( !strcmp(wrapper.cache[row_index].tag_bits, tag) ) {
-				printf("Found block in I-cache\n");
+
+		char temp_word[sizeof(word)];
+		char temp_row[sizeof(row)];
+		char temp_tag[sizeof(tag)];
+
+		strcpy(temp_word, word);
+		strcpy(temp_row, row);
+		strcpy(temp_tag, tag);
+
+		if( associativity == 1) {
+			printf("Row_index: %d\n", row_index);
+			if( wrapper.cache[row_index].tag_bits != '\0' ) {
+				printf("checking tag...\n");
+				printf("cache tag: %s\n", wrapper.cache[row_index].tag_bits);
+				printf("expected tag: %s\n", tag);
+				if( !strcmp(wrapper.cache[row_index].tag_bits, tag) ) {
+					printf("Found block in I-cache\n");
+					read_cache++;
+				} else {
+					printf("Incorrect block in I-cache\n");
+					mem_reads++;
+					conflict_miss++;
+				}
 			} else {
-				char temp_word[sizeof(word)];
-				strcpy(temp_word, word);
-				char temp_row[sizeof(row)];
-				strcpy(temp_row, row);
-				char temp_tag[sizeof(tag)];
-				strcpy(temp_tag, tag);
 				add_block(temp_word, temp_row, temp_tag, row_index);
-				printf("added new block\n");
+				compulsory_miss++;
+				mem_reads++;
 			}
-		} else {
-			compulsory_miss++;
-			printf("compulsory_miss1: %d\n", compulsory_miss);
-			char temp_word[sizeof(word)];
-			strcpy(temp_word, word);
-			char temp_row[sizeof(row)];
-			strcpy(temp_row, row);
-			char temp_tag[sizeof(tag)];
-			strcpy(temp_tag, tag);
-			add_block(temp_word, temp_row, temp_tag, row_index);
-			printf("added new block\n");
+		} else {	// associativity > 1
+			printf("associativity > 1\n");
+			if( wrapper.cache2D[row_index][word_index].tag_bits != '\0' ) {
+				if( !strcmp(wrapper.cache2D[row_index][word_index].tag_bits, tag) ) {
+					if( !strcmp(wrapper.cache2D[row_index][word_index].word_bits, word) ) {
+						printf("Found word in I-cache\n");
+						wrapper.cache2D[row_index][word_index].used_last++;
+						read_cache++;
+					} else {
+						printf("Incorrect block in I-cache\n");
+						replace_block(icache_info.replacement, temp_word, temp_row, temp_tag, row_index);
+						mem_reads++;
+						conflict_miss++;
+					}
+				}
+			} else {
+				compulsory_miss++;
+				mem_reads++;
+			}
 		}
-		printf("compulsory_miss2: %d\n", compulsory_miss);
 		/* These prints are just for debugging and should be removed. */
 		break;
 		case Access_D_READ:
@@ -330,7 +436,12 @@ void print_statistics()
 {
 	/* Finally, after all the simulation happens, you have to show what the
 	results look like. Do that here.*/
-	printf("Stuff happened!!!!!\n");
+	printf("Number of reads from the cache: %d\n", read_cache);
+	printf("Number of conflict misses: %d\n", conflict_miss);
+	printf("Number of words loaded from memory: %d\n", mem_reads*wpb);
+	printf("compulsory_misses: %d\n", compulsory_miss);
+	miss_rate = (float)(conflict_miss + compulsory_miss)/(float)read_cache;
+	printf("Read miss rate: %.2f\n", miss_rate);
 }
 /*******************************************************************************
 *
@@ -390,11 +501,14 @@ void read_trace_line(FILE* trace)
 	memaddr_t address;
 	char type;
 
-	fgets(line, sizeof(line), trace);
+	if(fgets(line, sizeof(line), trace) == NULL)
+	{
+		return;
+	}
+
 	if(sscanf(line, "0x%lx %c", &address, &type) < 2)
 	{
-		fprintf(stderr, "Malformed trace file.\n");
-		exit(1);
+		return;
 	}
 
 	switch(type)
