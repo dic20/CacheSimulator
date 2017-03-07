@@ -97,8 +97,8 @@ void setup_caches()
 
 			wrapper.cache2D = (struct Block **)malloc(sizeof(struct Block)*num_blocks*associativity);
 			for( int i = 0; i < num_blocks; i++ ) {
+				wrapper.cache2D[i] = (struct Block*)malloc(sizeof(struct Block)*associativity);
 				for( int j = 0; j < associativity; j++ ) {
-					printf("sdlkfjs\n");
 					wrapper.cache2D[i][j].tag_bits = '\0';
 					wrapper.cache2D[i][j].used_last = 0;
 				}
