@@ -67,6 +67,8 @@ int associativity;
 void setup_caches()
 {
 	/* Set up your caches here! */
+
+	/* Setting up I-Cache *************************************************************/
 	int num_blocks = icache_info.num_blocks;
 	int words_per_block = icache_info.words_per_block;
 	associativity = icache_info.associativity;
@@ -93,17 +95,19 @@ void setup_caches()
 
 			bit_extractor_calculator(&word_bits, &tag_bits, &row_bits, words_per_block, num_blocks);
 
-			struct Block cache2[num_blocks][associativity];
+			wrapper.cache2D = (struct Block **)malloc(sizeof(struct Block)*num_blocks*associativity);
 			for( int i = 0; i < num_blocks; i++ ) {
 				for( int j = 0; j < associativity; j++ ) {
-					cache2[i][j].tag_bits = '\0';
-					cache2[i][j].used_last = 0;
+					printf("sdlkfjs\n");
+					wrapper.cache2D[i][j].tag_bits = '\0';
+					wrapper.cache2D[i][j].used_last = 0;
 				}
 			}
-			wrapper.cache2D = cache2;
 			cache_size = num_blocks;
 		}
 	}
+ /*******************************************************************************/
+
 
 	/* This call to dump_cache_info is just to show some debugging information
 	and you may remove it. */
