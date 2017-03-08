@@ -107,7 +107,9 @@ int row_index_converter(char*);
 
 int word_index_converter(char*);
 
-void add_block(char*, char*, char*, int);
+void add_block(char*, char*, char*, int, char);
+
+void add_block_2(char*, char*, char*, int, int);
 
 void replace_block(ReplacementType, char*, char*, char*, int);
 

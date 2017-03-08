@@ -48,21 +48,37 @@ static CacheInfo icache_info;
 static CacheInfo dcache_info[3];
 struct Block block;
 struct Wrapper wrapper;
+struct Wrapper d_wrapper;
 int byte_bits;
 int data_size;
 int tag_bits;
 int word_bits;
 int row_bits;
+int d_tag_bits;
+int d_word_bits;
+int d_row_bits;
 int compulsory_miss = 0;
+int d_compulsory_miss = 0;
 char binary[8][5];
 char binary_address[32];
 int cache_size;
+int d_cache_size;
 int mem_reads = 0;
+int d_mem_reads = 0;
 int conflict_miss = 0;
+int d_conflict_miss = 0;
 int wpb;
 int read_cache = 0;
+int d_read_cache = 0;
 float miss_rate = 0.0;
+float d_miss_rate = 0.0;
 int associativity;
+int d_associativity;
+int d_wpb;
+int writes_to_cache = 0;
+int words_written_to_mem = 0;
+AllocateType a_type;
+WriteScheme w_scheme;
 
 void setup_caches()
 {
@@ -107,7 +123,43 @@ void setup_caches()
 		}
 	}
  /*******************************************************************************/
+	// d-cache-Level 1
+	int d_num_blocks = dcache_info[0].num_blocks;
+	int d_words_per_block = dcache_info[0].words_per_block;
+	d_associativity = dcache_info[0].associativity;
+	a_type = dcache_info[0].allocate_scheme;
+	w_scheme = dcache_info[0].write_scheme;
+	d_wpb = words_per_block;
 
+	if( d_associativity == 1 ) {
+
+		if( d_num_blocks != 0 ) {
+
+			bit_extractor_calculator(&d_word_bits, &d_tag_bits, &d_row_bits, d_words_per_block, d_num_blocks);
+
+			d_wrapper.cache = (struct Block *)malloc(sizeof(struct Block)*d_num_blocks);
+			for( int i = 0; i < d_num_blocks; i++ ) {
+				d_wrapper.cache[i].tag_bits = '\0';
+			}
+			d_cache_size = d_num_blocks;
+		}
+	} else {	//not direct-mapped setup
+
+		if( d_num_blocks != 0 ) {
+
+			bit_extractor_calculator(&d_word_bits, &d_tag_bits, &d_row_bits, d_words_per_block, d_num_blocks);
+
+			d_wrapper.cache2D = (struct Block **)malloc(sizeof(struct Block)*d_num_blocks*d_associativity);
+			for( int i = 0; i < d_num_blocks; i++ ) {
+				wrapper.cache2D[i] = (struct Block*)malloc(sizeof(struct Block)*d_associativity);
+				for( int j = 0; j < d_associativity; j++ ) {
+					d_wrapper.cache2D[i][j].tag_bits = '\0';
+					d_wrapper.cache2D[i][j].used_last = 0;
+				}
+			}
+			d_cache_size = d_num_blocks;
+		}
+	}
 
 	/* This call to dump_cache_info is just to show some debugging information
 	and you may remove it. */
@@ -284,18 +336,37 @@ int word_index_converter(char* word) {
 
 /*adds new block to cache.cache[] at row_index, sets valid = 1, dirty = 0
 simulates pulling from memory*/
-void add_block(char* temp_word, char* temp_row, char* temp_tag, int row_index) {
-	if( row_index < cache_size ) {
-		wrapper.cache[row_index].word_bits = temp_word;
-		wrapper.cache[row_index].row_bits = temp_row;
-		wrapper.cache[row_index].tag_bits = temp_tag;
-		wrapper.cache[row_index].valid = 0;
-		wrapper.cache[row_index].dirty = 0;
-		printf("added new block\n");
-	} else {
-		printf("TOO SMALL\n");
-		printf("row_index: %d\n", row_index);
-		printf("Cache_size: %d\n", cache_size);
+void add_block(char* temp_word, char* temp_row, char* temp_tag, int row_index, char cache_type) {
+	switch(cache_type)
+	{
+		case 'I':
+			if( row_index < cache_size ) {
+				wrapper.cache[row_index].word_bits = temp_word;
+				wrapper.cache[row_index].row_bits = temp_row;
+				wrapper.cache[row_index].tag_bits = temp_tag;
+				wrapper.cache[row_index].valid = 0;
+				wrapper.cache[row_index].dirty = 0;
+				printf("added new instruction block\n");
+			} else {
+				printf("TOO SMALL\n");
+				printf("row_index: %d\n", row_index);
+				printf("Cache_size: %d\n", cache_size);
+			}
+		break;
+		case 'D':
+		if( row_index < d_cache_size ) {
+			d_wrapper.cache[row_index].word_bits = temp_word;
+			d_wrapper.cache[row_index].row_bits = temp_row;
+			d_wrapper.cache[row_index].tag_bits = temp_tag;
+			d_wrapper.cache[row_index].valid = 0;
+			d_wrapper.cache[row_index].dirty = 0;
+			printf("added new data block\n");
+		} else {
+			printf("TOO SMALL\n");
+			printf("row_index: %d\n", row_index);
+			printf("Cache_size: %d\n", cache_size);
+		}
+		break;
 	}
 }
 
@@ -342,6 +413,22 @@ void replace_block(ReplacementType R, char* temp_word, char* temp_row, char* tem
 	}
 }
 
+//adds a block to 2D cache
+void add_block_2(char* temp_word, char* temp_row, char* temp_tag, int row_index, int word_index) {
+	if( row_index < cache_size ) {
+		wrapper.cache2D[row_index][word_index].word_bits = temp_word;
+		wrapper.cache2D[row_index][word_index].row_bits = temp_row;
+		wrapper.cache2D[row_index][word_index].tag_bits = temp_tag;
+		wrapper.cache2D[row_index][word_index].valid = 0;
+		wrapper.cache2D[row_index][word_index].dirty = 0;
+		printf("added block\n");
+	}	else {
+		printf("TOO SMALL\n");
+		printf("row_index: %d\n", row_index);
+		printf("Cache_size: %d\n", cache_size);
+	}
+}
+
 void handle_access(AccessType type, memaddr_t address)
 {
 	int row_index = 0;
@@ -368,6 +455,14 @@ void handle_access(AccessType type, memaddr_t address)
 	//convert word[] to word_index
 	word_index = word_index_converter(word);
 
+	char temp_word[sizeof(word)];
+	char temp_row[sizeof(row)];
+	char temp_tag[sizeof(tag)];
+
+	strcpy(temp_word, word);
+	strcpy(temp_row, row);
+	strcpy(temp_tag, tag);
+
 	/* This is where all the fun stuff happens! This function is called to
 	simulate a memory access. You figure out what type it is, and do all your
 	fun simulation stuff from here. */
@@ -375,63 +470,69 @@ void handle_access(AccessType type, memaddr_t address)
 	{
 		case Access_I_FETCH:
 		printf("I_FETCH at %08lx\n", address);
-
-		char temp_word[sizeof(word)];
-		char temp_row[sizeof(row)];
-		char temp_tag[sizeof(tag)];
-
-		strcpy(temp_word, word);
-		strcpy(temp_row, row);
-		strcpy(temp_tag, tag);
-
-		if( associativity == 1) {
-			printf("Row_index: %d\n", row_index);
-			if( wrapper.cache[row_index].tag_bits != '\0' ) {
-				printf("checking tag...\n");
-				printf("cache tag: %s\n", wrapper.cache[row_index].tag_bits);
-				printf("expected tag: %s\n", tag);
-				if( !strcmp(wrapper.cache[row_index].tag_bits, tag) ) {
-					printf("Found block in I-cache\n");
-					read_cache++;
-				} else {
-					printf("Incorrect block in I-cache\n");
-					mem_reads++;
-					conflict_miss++;
-				}
-			} else {
-				add_block(temp_word, temp_row, temp_tag, row_index);
-				compulsory_miss++;
-				mem_reads++;
-			}
-		} else {	// associativity > 1
-			printf("associativity > 1\n");
-			if( wrapper.cache2D[row_index][word_index].tag_bits != '\0' ) {
-				if( !strcmp(wrapper.cache2D[row_index][word_index].tag_bits, tag) ) {
-					if( !strcmp(wrapper.cache2D[row_index][word_index].word_bits, word) ) {
-						printf("Found word in I-cache\n");
-						wrapper.cache2D[row_index][word_index].used_last++;
+		if (1) {
+			if( associativity == 1 ) {
+				//printf("Row_index: %d\n", row_index);
+				if( wrapper.cache[row_index].tag_bits != '\0' ) {
+					if( !strcmp(wrapper.cache[row_index].tag_bits, tag) ) {
+						printf("Found block in I-cache\n");
 						read_cache++;
 					} else {
 						printf("Incorrect block in I-cache\n");
-						replace_block(icache_info.replacement, temp_word, temp_row, temp_tag, row_index);
 						mem_reads++;
 						conflict_miss++;
 					}
+				} else {
+					add_block(temp_word, temp_row, temp_tag, row_index, 'I');
+					compulsory_miss++;
+					mem_reads++;
 				}
-			} else {
-				compulsory_miss++;
-				mem_reads++;
+			} else {	// associativity > 1
+				if( wrapper.cache2D[row_index][word_index].tag_bits != '\0' ) {
+					if( !strcmp(wrapper.cache2D[row_index][word_index].tag_bits, tag) ) {
+						if( !strcmp(wrapper.cache2D[row_index][word_index].word_bits, word) ) {
+							printf("Found word in I-cache\n");
+							wrapper.cache2D[row_index][word_index].used_last++;
+							read_cache++;
+						} else {
+							printf("Incorrect block in I-cache\n");
+							replace_block(icache_info.replacement, temp_word, temp_row, temp_tag, row_index);
+							mem_reads++;
+							conflict_miss++;
+						}
+					}
+				} else {
+					add_block_2(temp_word, temp_row, temp_tag, row_index, word_index);
+					compulsory_miss++;
+					mem_reads++;
+				}
 			}
 		}
-		/* These prints are just for debugging and should be removed. */
 		break;
 		case Access_D_READ:
-
-		printf("D_READ at %08lx\n", address);
+			printf("D_READ at %08lx\n", address);
+			if( d_associativity == 1 ) {	// direct-mapped
+				if( d_wrapper.cache[row_index].tag_bits != '\0' ) {
+					if( !strcmp(d_wrapper.cache[row_index].tag_bits, tag) ) {
+						printf("Found block in D-cache\n");
+						d_read_cache++;
+					} else {
+						printf("Incorrect block in D-cache\n");
+						d_mem_reads++;
+						d_conflict_miss++;
+					}
+				} else {
+					add_block(temp_word, temp_row, temp_tag, row_index, 'D');
+					d_compulsory_miss++;
+					d_mem_reads++;
+				}
+			} else {	// associativity > 1
+				printf("LSDKJFSLDKFJS:LDKFJS:LDKFJS:DLKJFSL:DKFJ:SLKDFJSD:LF\n");
+			}
 		break;
 		case Access_D_WRITE:
+			printf("D_WRITE at %08lx\n", address);
 
-		printf("D_WRITE at %08lx\n", address);
 		break;
 	}
 }
@@ -440,12 +541,27 @@ void print_statistics()
 {
 	/* Finally, after all the simulation happens, you have to show what the
 	results look like. Do that here.*/
+	/************i-cache stats**************************/
+	printf("Instruction cache:\n");
 	printf("Number of reads from the cache: %d\n", read_cache);
 	printf("Number of conflict misses: %d\n", conflict_miss);
 	printf("Number of words loaded from memory: %d\n", mem_reads*wpb);
 	printf("compulsory_misses: %d\n", compulsory_miss);
 	miss_rate = (float)(conflict_miss + compulsory_miss)/(float)read_cache;
-	printf("Read miss rate: %.2f\n", miss_rate);
+	printf("Read miss rate (with compulsory): %.2f\n", miss_rate);
+	miss_rate = (float)(conflict_miss)/(float)read_cache;
+	printf("Read miss rate (without compulsory): %.2f\n", miss_rate);
+
+	/*******************d-cache stats****************************/
+	printf("Data cache\n");
+	printf("Number of reads from the cache: %d\n", d_read_cache);
+	printf("Memory reads: %d\n", d_mem_reads);
+	printf("Number of writes to cache: %d\n", writes_to_cache);
+	printf("Number of words written to memory: %d\n", words_written_to_mem);
+	printf("compulsory misses: %d\n", d_compulsory_miss);
+	printf("Conflict misses: \n");
+	printf("Read miss rate (with compulsory): \n");
+	printf("Read miss rate (without compulsory): \n");
 }
 /*******************************************************************************
 *
