@@ -109,9 +109,11 @@ int word_index_converter(char*);
 
 void add_block(char*, char*, char*, int, char);
 
-void add_block_2(char*, char*, char*, int, int);
+void add_block_2(char*, char*, char*, int, int, char);
 
 void replace_block(ReplacementType, char*, char*, char*, int);
+
+void write_to_block(char*, char*, char*, int, int, ReplacementType, AllocateType);
 
 struct Block
 {

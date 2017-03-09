@@ -370,7 +370,7 @@ void add_block(char* temp_word, char* temp_row, char* temp_tag, int row_index, c
 	}
 }
 
-/* replace block using specified replacement type */
+/* replace block using specified replacement type for I cache */
 void replace_block(ReplacementType R, char* temp_word, char* temp_row, char* temp_tag, int row_index) {
 	int Replace_Block_index = 0;
 	struct Block Replace_Block = wrapper.cache2D[row_index][0];
@@ -413,19 +413,81 @@ void replace_block(ReplacementType R, char* temp_word, char* temp_row, char* tem
 	}
 }
 
-//adds a block to 2D cache
-void add_block_2(char* temp_word, char* temp_row, char* temp_tag, int row_index, int word_index) {
-	if( row_index < cache_size ) {
-		wrapper.cache2D[row_index][word_index].word_bits = temp_word;
-		wrapper.cache2D[row_index][word_index].row_bits = temp_row;
-		wrapper.cache2D[row_index][word_index].tag_bits = temp_tag;
-		wrapper.cache2D[row_index][word_index].valid = 0;
-		wrapper.cache2D[row_index][word_index].dirty = 0;
-		printf("added block\n");
-	}	else {
-		printf("TOO SMALL\n");
-		printf("row_index: %d\n", row_index);
-		printf("Cache_size: %d\n", cache_size);
+//write to d_cache based on alloation scheme and replacement type
+void write_to_block(char* temp_word, char* temp_row, char* temp_tag, int row_index, int word_index, ReplacementType R, AllocateType A) {
+	int Replace_Block_index = 0;
+	struct Block Replace_Block = d_wrapper.cache2D[row_index][0];
+	switch(R)
+	{
+		case Replacement_RANDOM:
+			if( row_index < d_cache_size ) {
+				d_wrapper.cache2D[row_index][rand()].word_bits = temp_word;
+				d_wrapper.cache2D[row_index][rand()].row_bits = temp_row;
+				d_wrapper.cache2D[row_index][rand()].tag_bits = temp_tag;
+				d_wrapper.cache2D[row_index][rand()].valid = 0;
+				d_wrapper.cache2D[row_index][rand()].dirty = 0;
+				printf("Replaced block at random index: %d\n", rand());
+			}	else {
+				printf("TOO SMALL\n");
+				printf("row_index: %d\n", row_index);
+				printf("Cache_size: %d\n", d_cache_size);
+			}
+		break;
+		case Replacement_LRU:
+			for( int i = 0; i < associativity-1; i++ ) {	// find the block to replace, lowest used_last means LRu
+				if( Replace_Block.used_last > wrapper.cache2D[row_index][i+1].used_last ) {
+					Replace_Block = d_wrapper.cache2D[row_index][i];
+					Replace_Block_index++;
+				}
+			}
+			if( row_index < d_cache_size ) {
+				d_wrapper.cache2D[row_index][Replace_Block_index].word_bits = temp_word;
+				d_wrapper.cache2D[row_index][Replace_Block_index].row_bits = temp_row;
+				d_wrapper.cache2D[row_index][Replace_Block_index].tag_bits = temp_tag;
+				d_wrapper.cache2D[row_index][Replace_Block_index].valid = 0;
+				d_wrapper.cache2D[row_index][Replace_Block_index].dirty = 0;
+				printf("LRU Replace at index: %d\n", Replace_Block_index);
+			}	else {
+				printf("TOO SMALL\n");
+				printf("row_index: %d\n", row_index);
+				printf("Cache_size: %d\n", cache_size);
+			}
+		break;
+	}
+}
+
+//adds a block to 2D cache for compulsory misses
+void add_block_2(char* temp_word, char* temp_row, char* temp_tag, int row_index, int word_index, char cache_type) {
+	switch(cache_type)
+	{
+		case 'I':
+			if( row_index < cache_size ) {
+				wrapper.cache2D[row_index][word_index].word_bits = temp_word;
+				wrapper.cache2D[row_index][word_index].row_bits = temp_row;
+				wrapper.cache2D[row_index][word_index].tag_bits = temp_tag;
+				wrapper.cache2D[row_index][word_index].valid = 0;
+				wrapper.cache2D[row_index][word_index].dirty = 0;
+				printf("added block\n");
+			}	else {
+				printf("TOO SMALL\n");
+				printf("row_index: %d\n", row_index);
+				printf("Cache_size: %d\n", cache_size);
+			}
+		break;
+		case 'D':
+			if( row_index < d_cache_size ) {
+				d_wrapper.cache2D[row_index][word_index].word_bits = temp_word;
+				d_wrapper.cache2D[row_index][word_index].row_bits = temp_row;
+				d_wrapper.cache2D[row_index][word_index].tag_bits = temp_tag;
+				d_wrapper.cache2D[row_index][word_index].valid = 0;
+				d_wrapper.cache2D[row_index][word_index].dirty = 0;
+				printf("added block\n");
+			}	else {
+				printf("TOO SMALL\n");
+				printf("row_index: %d\n", row_index);
+				printf("Cache_size: %d\n", d_cache_size);
+			}
+		break;
 	}
 }
 
@@ -502,7 +564,7 @@ void handle_access(AccessType type, memaddr_t address)
 						}
 					}
 				} else {
-					add_block_2(temp_word, temp_row, temp_tag, row_index, word_index);
+					add_block_2(temp_word, temp_row, temp_tag, row_index, word_index, 'I');
 					compulsory_miss++;
 					mem_reads++;
 				}
@@ -527,7 +589,24 @@ void handle_access(AccessType type, memaddr_t address)
 					d_mem_reads++;
 				}
 			} else {	// associativity > 1
-				printf("LSDKJFSLDKFJS:LDKFJS:LDKFJS:DLKJFSL:DKFJ:SLKDFJSD:LF\n");
+				if( d_wrapper.cache2D[row_index][word_index].tag_bits != '\0' ) {
+					if( !strcmp(d_wrapper.cache2D[row_index][word_index].tag_bits, tag) ) {
+						if( !strcmp(d_wrapper.cache2D[row_index][word_index].word_bits, word) ) {
+							printf("Found word in I-cache\n");
+							d_wrapper.cache2D[row_index][word_index].used_last++;
+							d_read_cache++;
+						} else {
+							printf("Incorrect block in I-cache\n");
+							replace_block(dcache_info[0].replacement, temp_word, temp_row, temp_tag, row_index);
+							d_mem_reads++;
+							d_conflict_miss++;
+						}
+					}
+				} else {
+					add_block_2(temp_word, temp_row, temp_tag, row_index, word_index, 'D');
+					d_compulsory_miss++;
+					d_mem_reads++;
+				}
 			}
 		break;
 		case Access_D_WRITE:
