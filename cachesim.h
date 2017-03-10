@@ -111,9 +111,9 @@ void add_block(char*, char*, char*, int, char);
 
 void add_block_2(char*, char*, char*, int, int, char);
 
-void replace_block(ReplacementType, char*, char*, char*, int);
+void replace_block(ReplacementType, char*, char*, char*, int, char);
 
-void write_to_block(char*, char*, char*, int, int, ReplacementType, AllocateType);
+void write_to_block(char*, char*, char*, int, int, AllocateType);
 
 struct Block
 {
