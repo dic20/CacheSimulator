@@ -731,12 +731,12 @@ void handle_access(AccessType type, memaddr_t address)
 						d_read_cache++;
 					} else {	// bad data
 						write_to_block(temp_word, temp_row, temp_tag, row_index, word_index, a_type);
-						words_written_to_mem = words_written_to_mem + 1*d_wpb;
+						words_written_to_mem = words_written_to_mem + d_wpb;
 						d_conflict_miss = d_conflict_miss + d_wpb;
 					}
 				} else { // nothing is in the cache
 					d_compulsory_miss = d_compulsory_miss + d_wpb;
-					writes_to_cache = writes_to_cache + 1*d_wpb;
+					writes_to_cache = writes_to_cache + d_wpb;
 					add_block_2(temp_word, temp_row, temp_tag, row_index, word_index, 'D');
 				}
 			}
@@ -754,7 +754,7 @@ void print_statistics()
 	printf("Instruction cache:\n");
 	printf("\tNumber of reads from the cache: %d\n", read_cache);
 	printf("\tNumber of conflict misses: %d\n", conflict_miss);
-	printf("\tNumber of words loaded from memory: %d\n", mem_reads*wpb);
+	printf("\tNumber of words loaded from memory: %d\n", mem_reads);
 	printf("\tcompulsory_misses: %d\n", compulsory_miss);
 	miss_rate = (float)(conflict_miss + compulsory_miss)/(float)read_cache;
 	printf("\tRead miss rate (with compulsory): %.2f\n", miss_rate);
